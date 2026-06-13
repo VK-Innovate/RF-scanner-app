@@ -25,33 +25,42 @@ jobs:
             python3-pip git zip unzip openjdk-17-jdk \
             autoconf libtool pkg-config zlib1g-dev \
             libncurses5-dev libncursesw5-dev libtinfo5 \
-            cmake libffi-dev libssl-dev build-essential
+            cmake libffi-dev libssl-dev build-essential wget
+
+      - name: Install Android SDK manually
+        run: |
+          mkdir -p $HOME/android-sdk/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O /tmp/cmdtools.zip
+          unzip -q /tmp/cmdtools.zip -d $HOME/android-sdk/cmdline-tools
+          mv $HOME/android-sdk/cmdline-tools/cmdline-tools $HOME/android-sdk/cmdline-tools/latest
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+          yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT --licenses || true
+          sdkmanager --sdk_root=$ANDROID_SDK_ROOT \
+            "platforms;android-33" \
+            "build-tools;33.0.2" \
+            "platform-tools" \
+            "ndk;25.2.9519653"
+          echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
+          echo "ANDROID_NDK_ROOT=$HOME/android-sdk/ndk/25.2.9519653" >> $GITHUB_ENV
 
       - name: Install Python dependencies
         run: |
           pip install buildozer cython virtualenv
 
-      - name: Accept Android SDK licenses
-        run: |
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" >> ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "d975f751698a77b662f1254ddbeed3901e976f5a" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
-          echo "601085b94cd77f0b54ff86406957099ebe79c4d" > ~/.buildozer/android/platform/android-sdk/licenses/android-googletv-license
-          echo "33b6a2b64607f11b759f320ef9dff4ae5c47d97a" > ~/.buildozer/android/platform/android-sdk/licenses/google-gdk-license
-          yes | sdkmanager --licenses || true
-
       - name: Cache buildozer global directory
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-cache-${{ hashFiles('android_app/buildozer.spec') }}
-          restore-keys: buildozer-cache-
+          key: buildozer-cache-v2-${{ hashFiles('android_app/buildozer.spec') }}
+          restore-keys: buildozer-cache-v2-
 
       - name: Build APK
         working-directory: android_app
         run: |
-          buildozer android debug 2>&1 | tail -200
+          export ANDROID_SDK_ROOT=$HOME/android-sdk
+          export ANDROID_NDK_ROOT=$HOME/android-sdk/ndk/25.2.9519653
+          buildozer android debug 2>&1 | tail -300
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
