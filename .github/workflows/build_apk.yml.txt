@@ -1,0 +1,51 @@
+name: Build RF Scanner APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            python3-pip git zip unzip openjdk-17-jdk \
+            autoconf libtool pkg-config zlib1g-dev \
+            libncurses5-dev libncursesw5-dev libtinfo5 \
+            cmake libffi-dev libssl-dev build-essential
+
+      - name: Install Python dependencies
+        run: |
+          pip install buildozer cython virtualenv
+
+      - name: Cache buildozer global directory
+        uses: actions/cache@v3
+        with:
+          path: ~/.buildozer
+          key: buildozer-cache-${{ hashFiles('android_app/buildozer.spec') }}
+          restore-keys: buildozer-cache-
+
+      - name: Build APK
+        working-directory: android_app
+        run: |
+          buildozer android debug 2>&1 | tail -100
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: rf-scanner-apk
+          path: android_app/bin/*.apk
+          retention-days: 30
