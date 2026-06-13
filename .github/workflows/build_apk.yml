@@ -29,45 +29,39 @@ jobs:
             libtinfo5
           pip install buildozer==1.5.0 cython==0.29.33
 
-      - name: Setup buildozer to use existing SDK and NDK
-        run: |
-          # Point buildozer to GitHub's pre-installed SDK and NDK
-          mkdir -p ~/.buildozer/android/platform
-
-          # Symlink existing SDK
-          ln -sf /usr/local/lib/android/sdk \
-            ~/.buildozer/android/platform/android-sdk
-
-          # Find and symlink NDK
-          NDK_PATH=$(ls /usr/local/lib/android/sdk/ndk/ | head -1)
-          echo "Found NDK: $NDK_PATH"
-          ln -sf /usr/local/lib/android/sdk/ndk/$NDK_PATH \
-            ~/.buildozer/android/platform/android-ndk-r25b
-
-          # Accept licenses
-          mkdir -p /usr/local/lib/android/sdk/licenses
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" \
-            > /usr/local/lib/android/sdk/licenses/android-sdk-license
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" \
-            >> /usr/local/lib/android/sdk/licenses/android-sdk-license
-
-          echo "=== SDK ==="
-          ls ~/.buildozer/android/platform/android-sdk/
-          echo "=== NDK ==="
-          ls ~/.buildozer/android/platform/ | grep ndk
-
       - name: Cache buildozer
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-v8-${{ hashFiles('android_app/buildozer.spec') }}
-          restore-keys: buildozer-v8-
+          key: buildozer-v9-${{ hashFiles('android_app/buildozer.spec') }}
+          restore-keys: buildozer-v9-
+
+      - name: Setup SDK and NDK in buildozer paths
+        run: |
+          mkdir -p ~/.buildozer/android/platform
+
+          # SDK — symlink GitHub's pre-installed one
+          ln -sf /usr/local/lib/android/sdk \
+            ~/.buildozer/android/platform/android-sdk
+
+          # Accept licenses
+          sudo mkdir -p /usr/local/lib/android/sdk/licenses
+          echo -e "24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd" \
+            | sudo tee /usr/local/lib/android/sdk/licenses/android-sdk-license
+
+          # NDK — copy GitHub's pre-installed NDK to exact name buildozer expects
+          # buildozer 1.5.0 expects: android-ndk-r25b
+          cp -r /usr/local/lib/android/sdk/ndk/27.3.13750724 \
+            ~/.buildozer/android/platform/android-ndk-r25b
+
+          echo "=== Platform folder ==="
+          ls ~/.buildozer/android/platform/
+          echo "=== NDK folder ==="
+          ls ~/.buildozer/android/platform/android-ndk-r25b/ | head -5
 
       - name: Build APK
         working-directory: android_app
         run: |
-          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-          export ANDROID_NDK_ROOT=/usr/local/lib/android/sdk/ndk/27.3.13750724
           buildozer -v android debug 2>&1 | tail -500
 
       - name: Upload APK
