@@ -33,31 +33,39 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.buildozer
-          key: buildozer-v9-${{ hashFiles('android_app/buildozer.spec') }}
-          restore-keys: buildozer-v9-
+          key: buildozer-v10-${{ hashFiles('android_app/buildozer.spec') }}
+          restore-keys: buildozer-v10-
 
-      - name: Setup SDK and NDK in buildozer paths
+      - name: Setup SDK and NDK
         run: |
           mkdir -p ~/.buildozer/android/platform
 
-          # SDK — symlink GitHub's pre-installed one
+          # Symlink SDK
           ln -sf /usr/local/lib/android/sdk \
             ~/.buildozer/android/platform/android-sdk
 
+          # Create old-style tools/bin/sdkmanager wrapper
+          # that buildozer expects
+          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
+          cat > ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager << 'SCRIPT'
+#!/bin/bash
+exec /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "$@"
+SCRIPT
+          chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
+
           # Accept licenses
           sudo mkdir -p /usr/local/lib/android/sdk/licenses
-          echo -e "24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd" \
+          printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd" \
             | sudo tee /usr/local/lib/android/sdk/licenses/android-sdk-license
 
-          # NDK — copy GitHub's pre-installed NDK to exact name buildozer expects
-          # buildozer 1.5.0 expects: android-ndk-r25b
+          # Copy NDK to exact name buildozer expects
           cp -r /usr/local/lib/android/sdk/ndk/27.3.13750724 \
             ~/.buildozer/android/platform/android-ndk-r25b
 
-          echo "=== Platform folder ==="
+          echo "=== sdkmanager test ==="
+          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --version
+          echo "=== Platform ==="
           ls ~/.buildozer/android/platform/
-          echo "=== NDK folder ==="
-          ls ~/.buildozer/android/platform/android-ndk-r25b/ | head -5
 
       - name: Build APK
         working-directory: android_app
