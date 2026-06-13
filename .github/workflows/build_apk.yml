@@ -26,8 +26,8 @@ jobs:
             autoconf libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             cmake libffi-dev libssl-dev build-essential
-          pip install buildozer cython==0.29.33 python-for-android
-
+            pip install cython==0.29.33
+            pip install buildozer python-for-android
       - name: Accept SDK licenses
         run: |
           yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
