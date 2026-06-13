@@ -25,56 +25,55 @@ jobs:
             git zip unzip openjdk-11-jdk \
             autoconf libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
-            cmake libffi-dev libssl-dev build-essential \
-            libtinfo5
-          pip install buildozer==1.5.0 cython==0.29.33
+            cmake libffi-dev libssl-dev build-essential
+          pip install buildozer cython==0.29.33 python-for-android
 
-      - name: Cache buildozer
-        uses: actions/cache@v4
-        with:
-          path: ~/.buildozer
-          key: buildozer-v10-${{ hashFiles('android_app/buildozer.spec') }}
-          restore-keys: buildozer-v10-
-
-      - name: Setup SDK and NDK
+      - name: Accept SDK licenses
         run: |
-          mkdir -p ~/.buildozer/android/platform
-
-          # Symlink SDK
-          ln -sf /usr/local/lib/android/sdk \
-            ~/.buildozer/android/platform/android-sdk
-
-          # Create old-style tools/bin/sdkmanager wrapper
-          # that buildozer expects
-          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-          cat > ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager << 'SCRIPT'
-#!/bin/bash
-exec /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager "$@"
-SCRIPT
-          chmod +x ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager
-
-          # Accept licenses
+          yes | /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager --licenses || true
           sudo mkdir -p /usr/local/lib/android/sdk/licenses
           printf "24333f8a63b6825ea9c5514f83c2829b004d1fee\n84831b9409646a918e30573bab4c9c91346d8abd" \
             | sudo tee /usr/local/lib/android/sdk/licenses/android-sdk-license
+          printf "d975f751698a77b662f1254ddbeed3901e976f5a" \
+            | sudo tee /usr/local/lib/android/sdk/licenses/android-sdk-preview-license
 
-          # Copy NDK to exact name buildozer expects
-          cp -r /usr/local/lib/android/sdk/ndk/27.3.13750724 \
-            ~/.buildozer/android/platform/android-ndk-r25b
-
-          echo "=== sdkmanager test ==="
-          ~/.buildozer/android/platform/android-sdk/tools/bin/sdkmanager --version
-          echo "=== Platform ==="
-          ls ~/.buildozer/android/platform/
-
-      - name: Build APK
-        working-directory: android_app
+      - name: Install SDK build tools
         run: |
-          buildozer -v android debug 2>&1 | tail -500
+          /usr/local/lib/android/sdk/cmdline-tools/latest/bin/sdkmanager \
+            "build-tools;33.0.2" \
+            "platforms;android-33" \
+            "platform-tools" || true
+
+      - name: Build APK with p4a directly
+        run: |
+          export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
+          export ANDROID_NDK_ROOT=/usr/local/lib/android/sdk/ndk/27.3.13750724
+          
+          p4a apk \
+            --private android_app \
+            --package org.rfscanner \
+            --name "RF Scanner" \
+            --version 1.0 \
+            --bootstrap sdl2 \
+            --requirements python3,kivy,requests,pyjnius \
+            --arch arm64-v8a \
+            --permission INTERNET \
+            --permission ACCESS_WIFI_STATE \
+            --permission CHANGE_WIFI_STATE \
+            --permission ACCESS_FINE_LOCATION \
+            --permission ACCESS_COARSE_LOCATION \
+            --sdk-dir /usr/local/lib/android/sdk \
+            --ndk-dir /usr/local/lib/android/sdk/ndk/27.3.13750724 \
+            --android-api 33 \
+            --ndk-api 26 \
+            2>&1 | tail -300
+
+      - name: Find APK
+        run: find . -name "*.apk" 2>/dev/null || echo "No APK found"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: rf-scanner-apk
-          path: android_app/bin/*.apk
+          path: "*.apk"
           retention-days: 30
