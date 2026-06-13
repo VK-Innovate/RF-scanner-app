@@ -13,71 +13,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Build APK with Buildozer Action
+        uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
         with:
-          python-version: '3.10'
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            python3-pip git zip unzip openjdk-11-jdk \
-            autoconf libtool pkg-config zlib1g-dev \
-            libncurses5-dev libncursesw5-dev libtinfo5 \
-            cmake libffi-dev libssl-dev build-essential wget
-
-      - name: Install Python dependencies
-        run: |
-          pip install buildozer==1.5.0 cython==0.29.33 virtualenv
-
-      - name: Setup Android SDK and NDK
-        run: |
-          mkdir -p ~/.buildozer/android/platform/android-sdk/tools/bin
-
-          # Download old SDK tools (has sdkmanager in tools/bin)
-          wget -q https://dl.google.com/android/repository/sdk-tools-linux-4333796.zip -O /tmp/sdktools.zip
-          unzip -q /tmp/sdktools.zip -d ~/.buildozer/android/platform/android-sdk/
-
-          export ANDROID_SDK_ROOT=~/.buildozer/android/platform/android-sdk
-          export PATH=$PATH:$ANDROID_SDK_ROOT/tools/bin:$ANDROID_SDK_ROOT/platform-tools
-
-          # Accept licenses
-          mkdir -p $ANDROID_SDK_ROOT/licenses
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $ANDROID_SDK_ROOT/licenses/android-sdk-license
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" >> $ANDROID_SDK_ROOT/licenses/android-sdk-license
-          yes | sdkmanager --licenses || true
-
-          # Install SDK components
-          sdkmanager \
-            "platforms;android-33" \
-            "build-tools;33.0.2" \
-            "platform-tools" || true
-
-          # Download NDK r25b
-          wget -q https://dl.google.com/android/repository/android-ndk-r25b-linux.zip -O /tmp/ndk.zip
-          unzip -q /tmp/ndk.zip -d ~/.buildozer/android/platform/
-
-          echo "=== SDK contents ==="
-          ls ~/.buildozer/android/platform/android-sdk/
-          echo "=== NDK check ==="
-          ls ~/.buildozer/android/platform/ | grep ndk
-
-      - name: Cache buildozer
-        uses: actions/cache@v4
-        with:
-          path: ~/.buildozer
-          key: buildozer-cache-v6-${{ hashFiles('android_app/buildozer.spec') }}
-          restore-keys: buildozer-cache-v6-
-
-      - name: Build APK
-        working-directory: android_app
-        run: |
-          buildozer android debug 2>&1 | tail -300
+          workdir: android_app
+          buildozer_version: stable
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: rf-scanner-apk
-          path: android_app/bin/*.apk
+          path: ${{ steps.buildozer.outputs.filename }}
           retention-days: 30
